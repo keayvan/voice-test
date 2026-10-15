@@ -37,6 +37,7 @@ button.small { font: inherit; font-size: 14px; border: 1px solid var(--line); ba
 
   <div class="card">
     <div id="status">در حال آماده‌سازی…</div>
+    <div class="note" id="dev" style="text-align:center"></div>
     <div class="bar"><i id="prog"></i></div>
     <button id="mic" disabled aria-label="شروع ضبط">🎤</button>
     <p class="note" style="text-align:center;margin:0">بزن، جمله را بگو، دوباره بزن تا تمام شود.</p>
@@ -92,14 +93,34 @@ function show(text) {
     ${conv !== text ? `<div class="note">با رقم: ${esc(fa(conv))}</div>` : ""}<div>برنامه می‌فهمد: ${text ? understand(conv) : "—"}</div>
     <div class="note">${fa((ms / 1000).toFixed(1))} ثانیه از شروع ضبط</div></div>`);
 }
+/* مرحله ۱: دانلود با درصد واقعی و نگه‌داشتن در حافظهٔ مرورگر (بار دوم بدون دانلود)؛ مرحله ۲: باز کردن مدل در موتور (Worker) با زمان‌سنج */
+const MODEL = "model-fa.tar.gz", SIZE = 53012525;
+async function getModelBlob(setP) {
+  let cache = null; try { cache = await caches.open("vosk-fa-v1"); const hit = await cache.match(MODEL); if (hit) { setP(100, "مدل از قبل روی گوشی است"); return await hit.blob(); } } catch (e) {}
+  const res = await fetch(MODEL); if (!res.ok) throw new Error("دانلود نشد (" + res.status + ")");
+  const total = +res.headers.get("content-length") || SIZE, rd = res.body.getReader(), parts = []; let got = 0;
+  for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length;
+    setP(Math.min(99, Math.round(got * 100 / total)), "دانلود مدل: " + fa(Math.round(got / 1048576)) + " از " + fa(Math.round(total / 1048576)) + " مگابایت"); }
+  const blob = new Blob(parts, { type: "application/gzip" });
+  try { if (cache) await cache.put(MODEL, new Response(blob)); } catch (e) {}
+  return blob;
+}
 async function load() {
+  const p = $("#prog"), st = $("#status"), setP = (v, t) => { p.style.width = v + "%"; st.textContent = t; };
   try {
-    const p = $("#prog"); let pct = 5; const tick = setInterval(() => { pct = Math.min(90, pct + 3); p.style.width = pct + "%"; }, 400);
-    $("#status").textContent = "دانلود و آماده‌سازی مدل فارسی… (فقط بار اول طول می‌کشد)";
-    model = await Vosk.createModel("model-fa.tar.gz");
+    const blob = await getModelBlob(setP);
+    const url = URL.createObjectURL(blob), t1 = Date.now();
+    const tick = setInterval(() => { const sec = Math.round((Date.now() - t1) / 1000);
+      st.textContent = "باز کردن مدل در حافظهٔ گوشی… " + fa(sec) + " ثانیه" + (sec > 60 ? " — طول کشیده؛ شاید حافظهٔ گوشی کم است. برنامه‌های دیگر را ببند و صفحه را دوباره باز کن." : ""); }, 1000);
+    model = await new Promise((res, rej) => {
+      const m = new Vosk.Model(url);
+      m.on("load", e => (e.result ? res(m) : rej(new Error("موتور مدل را نپذیرفت"))));
+      m.on("error", e => rej(new Error(e.error || "خطای موتور")));
+      try { m.worker.addEventListener("error", e => rej(new Error("موتور از کار افتاد: " + (e.message || "احتمالاً کمبود حافظه")))); } catch (e) {}
+    });
     clearInterval(tick); p.style.width = "100%";
-    $("#status").textContent = "آماده است ✓"; $("#mic").disabled = false; $("#sample").disabled = false;
-  } catch (e) { $("#status").innerHTML = `<span class="bad">مدل بار نشد: ${esc(e.message || e)}</span>`; }
+    st.textContent = "آماده است ✓ (باز کردن: " + fa(Math.round((Date.now() - t1) / 1000)) + " ثانیه)"; $("#mic").disabled = false; $("#sample").disabled = false;
+  } catch (e) { st.innerHTML = `<span class="bad">${esc(e.message || e)}</span>`; }
 }
 async function start() {
   try {
@@ -138,6 +159,7 @@ $("#sample").onclick = async () => {
 };
 $("#mic").onclick = () => (on ? stop() : start());
 $("#clear").onclick = () => { $("#out").innerHTML = ""; };
+$("#dev").textContent = navigator.userAgent.replace(/^Mozilla\/5\.0 /, "").slice(0, 120);
 load();
 </script>
 </body>
