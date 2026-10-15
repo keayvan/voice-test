@@ -465,7 +465,7 @@
       }
     }
 
-    let f = findStaff(s0, staff);
+    let f = ctx.forceStaff ? { p: ctx.forceStaff } : findStaff(s0, staff);   /* forceStaff: انتخابِ کاربر بین هم‌نام‌ها */
     /* جریمه و تشویق: مدیر ← تأییدشده؛ کسی که ردیف adj.request دارد ← درخواست در انتظار برای همکار */
     if (has(s0, [...FINE, ...BONUS]) && !has(s0, ["نوبت", "مرخصی"])) { const r = parseAdjust(s0, f, ctx, raw); return r.miss !== undefined ? miss(r.why) : r; }
     /* کارمندِ غیرمدیر: فقط برای خودش (اسم نیاید یعنی خودش)؛ دیگران فقط با مدیر */
@@ -554,6 +554,14 @@
     const r = parseClause0(raw, ctx);
     if (!r || r.miss === undefined) return r;
     const s0 = norm(raw);
+    /* نام مشترک («اکبری»): به‌جای «نام کامل را بنویس»، همان جمله با نام کامل هر کدام امتحان می‌شود؛ هرچه فهمیده شد دکمهٔ انتخاب است */
+    const amb = findStaff(s0, ctx.staff || []).ambiguous;
+    if (amb && !ctx.noAsk) {
+      const choices = amb.map(p => ({ p, it: parseClause0(raw, { ...ctx, forceStaff: p }) }))
+        .filter(x => x.it && x.it.miss === undefined && x.it.kind !== "ask").map(x => ({ label: x.p.name, item: x.it }));
+      if (choices.length > 1) return { kind: "ask", text: "منظور کدام نفر است؟ (اسم را بگو یا بزن)", choices };
+      if (choices.length === 1) return choices[0].item;
+    }
     if (has(s0, [...MOVE, ...CANCEL, ...REMOVE, ...MEET, ...REASON_MARK]) || has(s0, ADD) && ROLES.some(([rx]) => rx.test(s0)) || takeAmount(s0).amount || /(?:^| )ساعت \d/.test(s0)) return r;
     if (has(s0, LEAVE) && findStaff(s0, ctx.staff || []).p && !has(s0, ASKW)) return r;
     const q = parseQuery(s0, ctx, raw, true);
@@ -588,6 +596,18 @@
     return { items, misses };
   }
 
-  root.MC = { parse, MONTHS, EXPORTS, QUERIES, NAV, takePeriod };
+  /* جواب به سؤالِ باز (kind: ask) با متن یا صدا: «الهام اکبری»، «دومی»، «همه». خروجی: شمارهٔ گزینه یا -1 */
+  function answer(ask, text) {
+    const s = norm(text || ""); if (!s || !ask || !ask.choices) return -1;
+    const ORD = [["اولی", "اول", "یکی"], ["دومی", "دوم"], ["سومی", "سوم"], ["چهارمی", "چهارم"]];
+    for (let i = 0; i < ORD.length && i < ask.choices.length; i++) if (has(s, ORD[i])) return i;
+    const toks = new Set(s.split(" ")), sc = ask.choices.map((c, i) => { const w = norm(c.label).split(" ").filter(x => x.length >= 2);
+      return { i, hit: w.filter(x => toks.has(x)).length, all: w.length && w.every(x => toks.has(x)) }; });
+    const full = sc.filter(x => x.all); if (full.length === 1) return full[0].i;
+    const best = Math.max(0, ...sc.map(x => x.hit)), top = sc.filter(x => x.hit === best && best > 0);
+    return top.length === 1 ? top[0].i : -1;
+  }
+
+  root.MC = { parse, answer, MONTHS, EXPORTS, QUERIES, NAV, takePeriod };
   if (typeof module !== "undefined") module.exports = root.MC;
 })(typeof globalThis !== "undefined" ? globalThis : this);

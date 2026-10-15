@@ -5,207 +5,65 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>آزمایش دستور صوتی</title>
 <style>
-@font-face { font-family: Vazirmatn; src: url(Vazirmatn-wght.woff2) format("woff2"); font-weight: 100 900; }
-:root { --bg: #f6f7f9; --fg: #1d2330; --muted: #667085; --card: #fff; --line: #e3e6ec; --accent: #2f6fde; --ok: #1f9d55; --bad: #d64545; }
-@media (prefers-color-scheme: dark) { :root { --bg: #161a21; --fg: #e8ebf1; --muted: #98a2b3; --card: #1f2530; --line: #2e3542; --accent: #6b9cf5; --ok: #4cc38a; --bad: #f07171; } }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.7 Vazirmatn, system-ui, sans-serif; }
-main { max-width: 640px; margin: 0 auto; padding: 16px; }
-h1 { font-size: 20px; margin: 4px 0 2px; }
-.note { color: var(--muted); font-size: 14px; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 12px 0; }
-#mic { width: 120px; height: 120px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; font: inherit; font-size: 40px; display: block; margin: 8px auto; cursor: pointer; }
-#mic:disabled { opacity: .45; cursor: default; }
-#mic.on { background: var(--bad); animation: pulse 1.2s infinite; }
-@keyframes pulse { 50% { transform: scale(1.06); } }
-#status { text-align: center; }
-#live { min-height: 2.4em; font-size: 20px; font-weight: 600; text-align: center; margin-top: 8px; }
-#live.done { color: var(--ok); }
-#heard { text-align: center; font-size: 15px; }
-.res { border-top: 1px solid var(--line); padding: 8px 0; }
-.res:first-child { border-top: 0; }
-.res b { display: block; }
-.ok { color: var(--ok); } .bad { color: var(--bad); }
-.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; }
-.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
-ul { padding-inline-start: 20px; margin: 4px 0; }
-button.small { font: inherit; font-size: 14px; border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+  @font-face { font-family: Vazirmatn; src: url(fonts/Vazirmatn-wght.woff2) format("woff2"); font-weight: 100 900; }
+  :root { --bg: #f6f7f9; --fg: #1d2330; --muted: #5d6675; --card: #fff; --line: #e3e6ec; --ok: #1f7a4d; --bad: #b3261e; --btn: #2457c5; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #12151b; --fg: #e8ebf1; --muted: #9aa3b2; --card: #1c2129; --line: #2e3542; --ok: #5cc493; --bad: #ff8a80; --btn: #6c9bff; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.8 Vazirmatn, Tahoma, sans-serif; }
+  main { max-width: 600px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.25em; margin: 4px 0; }
+  .note { color: var(--muted); font-size: .9em; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 12px 0; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { font: inherit; border: 0; background: transparent; color: var(--fg); padding: 6px 18px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--btn); color: #fff; }
+  #mic { width: 120px; height: 120px; border-radius: 50%; border: 0; background: var(--btn); color: #fff; font-size: 2.4em; display: block; margin: 10px auto 4px; cursor: pointer; }
+  #mic:disabled { opacity: .45; cursor: default; }
+  #mic.on { background: var(--bad); }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--btn); }
+  textarea { width: 100%; min-height: 80px; font: inherit; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+  .btn { font: inherit; border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 10px; padding: 6px 14px; cursor: pointer; margin: 4px 0 0 6px; }
+  .btn.primary { background: var(--btn); color: #fff; border-color: var(--btn); }
+  ul { list-style: none; padding: 0; margin: 6px 0 0; }
+  li { border-top: 1px solid var(--line); padding: 6px 0; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font-size: .9em; } td { padding: 3px 0; vertical-align: top; } td:last-child { text-align: left; }
 </style>
 </head>
 <body>
 <main>
-  <h1>آزمایش دستور صوتی فارسی</h1>
-  <p class="note">تشخیص گفتار روی خود گوشی (Vosk)؛ صدا به هیچ سروری نمی‌رود. بار اول مدل فارسی (حدود ۵۳ مگابایت) دانلود می‌شود.</p>
+  <h1>آزمایش دستور صوتی</h1>
+  <p class="note">همان موتور و همان فهم دستورِ اپ کلینیک، بدون ورود و بدون دادهٔ کلینیک. تشخیص گفتار روی خود گوشی است و صدا جایی فرستاده نمی‌شود. بار اول مدل گفتار (حدود ۵۰ مگابایت) دانلود می‌شود.</p>
 
   <div class="card">
-    <div id="status">در حال آماده‌سازی…</div>
-    <div class="note" id="dev" style="text-align:center"></div>
-    <div class="bar"><i id="prog"></i></div>
-    <button id="mic" disabled aria-label="شروع ضبط">🎤</button>
-    <p class="note" style="text-align:center;margin:0">بزن و جمله را بگو؛ وقتی ۱٫۵ ثانیه ساکت شدی خودش تمام می‌کند (یا دوباره بزن).</p>
-    <div class="bar" title="بلندی صدا"><i id="lvl" style="transition:none"></i></div>
-    <div style="margin-top:8px;font-size:14px">
-      <label style="display:block"><input type="checkbox" id="optGate"> فقط صدای نزدیک (صدای دور مثل تلویزیون حذف شود)</label>
-      <label style="display:block"><input type="checkbox" id="optStop" checked> وقتی ساکت شدم خودش تمام کند</label>
-      <label style="display:block"><input type="checkbox" id="optGram"> فقط کلمه‌های دستورها را بشناسد</label>
+    <div class="seg" role="group" aria-label="حالت"><button type="button" data-mode="voice">گفتاری</button><button type="button" data-mode="text">نوشتاری</button></div>
+    <div id="voiceBox">
+      <button id="mic" type="button" disabled aria-label="شروع گفتن">🎤</button>
+      <p class="note" id="hint" style="text-align:center;margin:0">در حال آماده‌سازی…</p>
+      <div class="bar"><i id="prog"></i></div>
     </div>
-    <div id="live" aria-live="polite"></div>
-    <div id="heard"></div>
-    <div class="note" id="dbg" style="text-align:center;font-size:12px"></div>
-    <p style="text-align:center;margin:6px 0 0"><button class="small" id="sample" disabled>امتحان با فایل صوتی نمونه (بدون میکروفون)</button></p>
+    <div id="textBox" hidden>
+      <textarea id="txt" placeholder="مثلاً: علی رضایی ۵۰۰ هزار جریمه به خاطر تاخیر"></textarea>
+      <button class="btn primary" id="parse" type="button">بفهم</button>
+    </div>
+    <ul id="log"></ul>
+    <button class="btn" id="reset" type="button">از اول</button>
   </div>
 
   <div class="card">
     <strong>چند جمله برای امتحان</strong>
-    <ul class="note">
-      <li>تعداد بیماران امروز</li><li>چه کسانی امروز سر کارند</li><li>ساعت پانزده جلسه</li>
-      <li>برو به صفحه بیمه</li><li>دکتر نوری فردا مرخصی است</li><li>خروجی نوبت های ماه قبل</li>
-      <li>درآمد این ماه چقدر بود</li><li>علی رضایی پانصد هزار جریمه به خاطر تاخیر</li>
-    </ul>
+    <ul class="note" id="samples"></ul>
+    <p class="note" style="margin:6px 0 0">کارکنان نمونه: دکتر ندا اکبری، الهام اکبری، آزاده اکبری، علی رضایی، مریم رضایی، دکتر نوری.</p>
   </div>
 
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center"><strong>نتیجه‌ها</strong><button class="small" id="clear">پاک کردن</button></div>
-    <p class="note" style="margin:0">«برنامه می‌فهمد»: همان چیزی که کادر «دستور» اپ از این متن می‌فهمد (با کارکنان نمونه: دکتر نوری، دکتر احمدی، علی رضایی، مریم رضایی).</p>
-    <div id="out"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center"><strong>گزارش این گوشی</strong><button class="btn" id="copy" type="button">کپی گزارش</button></div>
+    <table id="dev"></table>
+    <p class="note" id="copied" style="margin:0"></p>
   </div>
 </main>
-<script src="jalali.js"></script><script src="apptcal.js"></script><script src="hours.js"></script><script src="nlu.js"></script><script src="mgrcmd.js"></script>
-<script src="vosk.js"></script>
-<script>
-const $ = s => document.querySelector(s), fa = s => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const STAFF = [{ id: "d1", name: "دکتر نوری", role: "doctor" }, { id: "d2", name: "دکتر احمدی", role: "doctor" },
-  { id: "s1", name: "علی رضایی", role: "assistant" }, { id: "r1", name: "مریم رضایی", role: "reception" }];
-/* اعداد گفته‌شده (پانصد، پانزده، …) را Vosk با حروف می‌نویسد؛ برای فهم برنامه به رقم برمی‌گردانیم */
-const ONES = { صفر: 0, یک: 1, دو: 2, سه: 3, چهار: 4, پنج: 5, شش: 6, هفت: 7, هشت: 8, نه: 9, ده: 10, یازده: 11, دوازده: 12, سیزده: 13, چهارده: 14,
-  پانزده: 15, پونزده: 15, شانزده: 16, شونزده: 16, هفده: 17, هجده: 18, هیجده: 18, نوزده: 19, بیست: 20, سی: 30, چهل: 40, پنجاه: 50, شصت: 60, هفتاد: 70, هشتاد: 80, نود: 90,
-  صد: 100, یکصد: 100, دویست: 200, سیصد: 300, چهارصد: 400, پانصد: 500, ششصد: 600, هفتصد: 700, هشتصد: 800, نهصد: 900 };
-function words2num(t) {
-  const w = t.split(/\s+/), out = [];
-  for (let i = 0; i < w.length; i++) {
-    if (ONES[w[i]] == null || (w[i] === "یک" || w[i] === "نه" || w[i] === "سی") && ONES[w[i + 1]] == null && !/^(ساعت|روز|هفته|ماه|میلیون|هزار)$/.test(w[i + 1] || "")) { out.push(w[i]); continue; }
-    let n = ONES[w[i]];
-    while (w[i + 1] === "و" && ONES[w[i + 2]] != null && ONES[w[i + 2]] < n) { n += ONES[w[i + 2]]; i += 2; }
-    out.push(String(n));
-  }
-  return out.join(" ");
-}
-function understand(text) {
-  const r = MC.parse(text, { staff: STAFF, today: AC.isoOf(new Date()), appts: {} });
-  if (r.items.length) return `<span class="ok">✓ ${r.items.map(i => esc(i.text)).join(" | ")}</span>`;
-  return `<span class="bad">✗ نفهمید${r.misses[0] && r.misses[0].why ? ": " + esc(r.misses[0].why) : ""}</span>`;
-}
-let VOCAB = null; fetch("vocab.json").then(r => r.json()).then(v => { VOCAB = v; }).catch(() => {});
-let model = null, rec = null, ctx = null, src = null, node = null, stream = null, on = false, t0 = 0, finalText = "";
-function show(text) {
-  const conv = words2num(text), ms = Date.now() - t0;
-  $("#heard").innerHTML = text ? "برنامه می‌فهمد: " + understand(conv) : "";
-  $("#out").insertAdjacentHTML("afterbegin", `<div class="res"><b>${esc(text || "(چیزی شنیده نشد)")}</b>
-    ${conv !== text ? `<div class="note">با رقم: ${esc(fa(conv))}</div>` : ""}<div>برنامه می‌فهمد: ${text ? understand(conv) : "—"}</div>
-    <div class="note">${fa((ms / 1000).toFixed(1))} ثانیه از شروع ضبط</div></div>`);
-}
-/* مرحله ۱: دانلود با درصد واقعی و نگه‌داشتن در حافظهٔ مرورگر (بار دوم بدون دانلود)؛ مرحله ۲: باز کردن مدل در موتور (Worker) با زمان‌سنج */
-const MODEL = "model-fa.tar.gz", SIZE = 53012525;
-async function getModelBlob(setP) {
-  let cache = null; try { cache = await caches.open("vosk-fa-v1"); const hit = await cache.match(MODEL); if (hit) { setP(100, "مدل از قبل روی گوشی است"); return await hit.blob(); } } catch (e) {}
-  const res = await fetch(MODEL); if (!res.ok) throw new Error("دانلود نشد (" + res.status + ")");
-  const total = +res.headers.get("content-length") || SIZE, rd = res.body.getReader(), parts = []; let got = 0;
-  for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length;
-    setP(Math.min(99, Math.round(got * 100 / total)), "دانلود مدل: " + fa(Math.round(got / 1048576)) + " از " + fa(Math.round(total / 1048576)) + " مگابایت"); }
-  const blob = new Blob(parts, { type: "application/gzip" });
-  try { if (cache) await cache.put(MODEL, new Response(blob)); } catch (e) {}
-  return blob;
-}
-async function load() {
-  const p = $("#prog"), st = $("#status"), setP = (v, t) => { p.style.width = v + "%"; st.textContent = t; };
-  try {
-    const blob = await getModelBlob(setP);
-    const url = URL.createObjectURL(blob), t1 = Date.now();
-    const tick = setInterval(() => { const sec = Math.round((Date.now() - t1) / 1000);
-      st.textContent = "باز کردن مدل در حافظهٔ گوشی… " + fa(sec) + " ثانیه" + (sec > 60 ? " — طول کشیده؛ شاید حافظهٔ گوشی کم است. برنامه‌های دیگر را ببند و صفحه را دوباره باز کن." : ""); }, 1000);
-    model = await new Promise((res, rej) => {
-      const m = new Vosk.Model(url);
-      m.on("load", e => (e.result ? res(m) : rej(new Error("موتور مدل را نپذیرفت"))));
-      m.on("error", e => rej(new Error(e.error || "خطای موتور")));
-      try { m.worker.addEventListener("error", e => rej(new Error("موتور از کار افتاد: " + (e.message || "احتمالاً کمبود حافظه")))); } catch (e) {}
-    });
-    clearInterval(tick); p.style.width = "100%";
-    st.textContent = "آماده است ✓ (باز کردن: " + fa(Math.round((Date.now() - t1) / 1000)) + " ثانیه)"; $("#mic").disabled = false; $("#sample").disabled = false;
-  } catch (e) { st.innerHTML = `<span class="bad">${esc(e.message || e)}</span>`; }
-}
-/* یک AudioContext و یک Recognizer برای کل صفحه (ساختن دوباره در هر بار، روی گوشی بعد از بار اول از کار می‌افتاد)؛
-   هر بار ضبط فقط میکروفون را باز و بسته می‌کند و آخرش retrieveFinalResult تشخیص‌دهنده را برای جملهٔ بعد خالی می‌کند */
-let recMode = null, dbg = { frames: 0, fed: 0, results: 0 };
-function getRec() {
-  const mode = $("#optGram").checked && VOCAB ? "gram" : "free";
-  try { if (rec) rec.remove(); } catch (e) {}   /* هر جمله تشخیص‌دهندهٔ تازه؛ موتور صوتی همان یکی می‌ماند */
-  rec = mode === "gram" ? new model.KaldiRecognizer(ctx.sampleRate, JSON.stringify([...VOCAB, "[unk]"])) : new model.KaldiRecognizer(ctx.sampleRate);
-  recMode = mode;
-  rec.on("result", m => { dbg.results++; const t = (m.result.text || "").trim(); if (on || stopping) { if (t) finalText += (finalText ? " " : "") + t; $("#live").textContent = finalText; } });
-  rec.on("partialresult", m => { if (on) $("#live").textContent = (finalText + " " + (m.result.partial || "")).trim(); });
-  return rec;
-}
-const feed = b => { try { rec.acceptWaveform(b); dbg.fed++; } catch (x) {} };
-let stopping = false;
-async function start() {
-  if (stopping) return;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
-  } catch (e) { $("#status").innerHTML = `<span class="bad">اجازهٔ میکروفون داده نشد.</span>`; return; }
-  if (!ctx || ctx.state === "closed") ctx = new (window.AudioContext || window.webkitAudioContext)();
-  try { await ctx.resume(); } catch (e) {}
-  getRec(); finalText = ""; dbg = { frames: 0, fed: 0, results: 0 };
-  src = ctx.createMediaStreamSource(stream); node = ctx.createScriptProcessor(4096, 1, 1);
-  const G = { floor: 0, n: 0, peak: 0, open: 0, spoke: 0, quiet: 0 }, fr = 4096 / ctx.sampleRate, pre = [];
-  node.onaudioprocess = e => {
-    if (!on) return;
-    dbg.frames++;
-    const d = e.inputBuffer.getChannelData(0); let sum = 0; for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
-    const rms = Math.sqrt(sum / d.length);
-    if (G.n < 6) { G.floor = (G.floor * G.n + rms) / (G.n + 1); G.n++; }
-    else if (rms < G.floor) G.floor = G.floor * 0.95 + rms * 0.05;
-    /* آستانه ملایم: ۲ برابر کف نویز یا ۱۵٪ اوج صدای گوینده؛ بعد از هر صدای بلند ۰٫۷ ثانیه باز می‌ماند تا آخر کلمه‌ها بریده نشود */
-    const th = Math.max(G.floor * 2, G.peak * 0.15, 0.003), loud = rms > th;
-    if (loud) { G.peak = Math.max(G.peak * 0.997, rms); G.open = 0.7; G.spoke += fr; G.quiet = 0; } else { G.open -= fr; if (G.spoke > 0.3) G.quiet += fr; }
-    $("#lvl").style.width = Math.min(100, Math.round(rms * 400)) + "%"; $("#lvl").style.background = G.open > 0 ? "var(--ok)" : "var(--muted)";
-    const copy = ctx.createBuffer(1, d.length, ctx.sampleRate); copy.copyToChannel(new Float32Array(d), 0);
-    if (!$("#optGate").checked || G.n < 6) feed(copy);
-    else if (G.open > 0) { while (pre.length) feed(pre.shift()); feed(copy); }   /* تازه باز شد ← دو تکهٔ قبلی هم، تا اول کلمه بریده نشود */
-    else { pre.push(copy); if (pre.length > 2) pre.shift(); }   /* صدای دور اصلاً به موتور داده نمی‌شود (سکوتِ مصنوعی تشخیص را خراب می‌کرد) */
-    if ($("#optStop").checked && G.quiet > 1.5) stop();
-    else if (Date.now() - t0 > 15000) stop();
-  };
-  src.connect(node); node.connect(ctx.destination);
-  on = true; t0 = Date.now(); $("#mic").classList.add("on"); $("#mic").textContent = "⏹"; $("#status").textContent = "گوش می‌دهم…";
-  $("#live").textContent = ""; $("#live").classList.remove("done"); $("#heard").innerHTML = "";
-}
-async function stop() {
-  if (!on) return; on = false; stopping = true;
-  $("#mic").classList.remove("on"); $("#mic").textContent = "🎤"; $("#mic").disabled = true; $("#status").textContent = "در حال تمام کردن…";
-  try { node.onaudioprocess = null; node.disconnect(); src.disconnect(); stream.getTracks().forEach(t => t.stop()); } catch (e) {}
-  const n0 = dbg.results; try { rec.retrieveFinalResult(); } catch (e) {}
-  for (let i = 0; i < 30 && dbg.results === n0; i++) await new Promise(r => setTimeout(r, 100));
-  stopping = false; $("#mic").disabled = false; $("#status").textContent = "آماده است ✓";
-  const text = finalText.trim();
-  $("#live").textContent = text || "(چیزی شنیده نشد)"; $("#live").classList.add("done"); show(text);
-  $("#dbg").textContent = "تکه‌های صدا: " + fa(dbg.frames) + " · به موتور: " + fa(dbg.fed) + " · نتیجه: " + fa(dbg.results);
-}
-/* فایل نمونهٔ خود مدل («من عرضه این کارو ندارم») برای اطمینان از کار کردن موتور بدون میکروفون */
-$("#sample").onclick = async () => {
-  t0 = Date.now(); const ac = new (window.AudioContext || window.webkitAudioContext)();
-  const buf = await ac.decodeAudioData(await (await fetch("sample.wav")).arrayBuffer());
-  const r = new model.KaldiRecognizer(buf.sampleRate); let txt = "";
-  r.on("result", m => { const t = (m.result.text || "").trim(); if (t) txt += (txt ? " " : "") + t; });
-  const step = 4096, ch = buf.getChannelData(0);
-  for (let i = 0; i < ch.length; i += step) { const b = ac.createBuffer(1, Math.min(step, ch.length - i), buf.sampleRate); b.copyToChannel(ch.slice(i, i + step), 0); r.acceptWaveform(b); }
-  const n0 = txt.length; r.retrieveFinalResult(); for (let i = 0; i < 30 && txt.length === n0; i++) await new Promise(res => setTimeout(res, 100));
-  r.remove(); ac.close(); show(txt + "   (درست: «من عرضه این کارو ندارم»)");
-};
-$("#mic").onclick = () => (on ? stop() : start());
-$("#clear").onclick = () => { $("#out").innerHTML = ""; };
-$("#dev").textContent = navigator.userAgent.replace(/^Mozilla\/5\.0 /, "").slice(0, 120);
-load();
-</script>
+<script src="jalali.js"></script><script src="apptcal.js"></script><script src="hours.js"></script><script src="nlu.js"></script><script src="mgrcmd.js"></script><script src="voice.js"></script>
+<script src="voicetest.js"></script>
 </body>
 </html>
