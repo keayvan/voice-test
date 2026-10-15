@@ -330,7 +330,8 @@
     "گزارش", "وضعیت", "آمار", "لیست", "فهرست", "نشان بده", "نشون بده", "بگو", "ببینم", "هست", "هستند", "هستن", "داریم", "دارد", "داره"];
   /* day: بازهٔ پیش‌فرض امروز؛ span: بازهٔ نگفته ← سؤال؛ none: بی‌بازه. who: نام دکتر/کارمند فیلتر می‌شود */
   const QUERIES = [
-    { key: "who", label: "چه کسی سر کار است", words: ["سر کار", "سرکار", "سر کارند", "سر کاره", "سرکارند", "سرکاره", "حاضر", "حاضرند", "حضور", "شیفت"], p: "day", who: true },
+    { key: "who", label: "چه کسی سر کار است", words: ["سر کار", "سرکار", "سر کارند", "سر کاره", "سرکارند", "سرکاره", "حاضر", "حاضرند", "حضور", "شیفت",
+      "چند نفر", "چند نفریم", "چه کسانی هستند", "کیا هستن", "کی ها هستن", "کیا هستند", "در مجموع", "روی هم"], p: "day", who: true },
     { key: "work", label: "گزارش کارکرد", words: ["کارکرد", "عملکرد", "کار کرد"], p: "span", who: true },
     { key: "appts", label: "نوبت‌ها و بیماران", words: ["بیمار", "بیماران", "بیمارها", "نوبت", "نوبت ها", "نوبتها", "مراجعه", "مراجعین", "مراجعه کننده"], p: "day", who: true },
     { key: "newpat", label: "بیماران تازه", words: ["بیمار جدید", "بیماران جدید", "بیمار تازه", "بیماران تازه", "پرونده جدید", "پرونده های جدید"], p: "span" },
@@ -349,9 +350,21 @@
     const hits = QUERIES.filter(q => modOk(ctx, q.mod)).map(q => ({ q, w: q.words.map(norm).filter(w => new RegExp("(?:^| )" + w + "(?= |$)").test(s)).sort((a, b) => b.length - a.length)[0] })).filter(x => x.w);
     let top = hits.filter(x => !hits.some(y => y !== x && y.w.length > x.w.length && (" " + y.w + " ").includes(" " + x.w + " ")));
     /* اولویت: who، کارکرد و موضوع‌های خاص بر «بیمار/نوبت» عمومی غلبه می‌کنند */
+    /* «چند نفر/در مجموع» کلی است: اگر موضوع دیگری هم هست («چند نفر نیامدند»، «چند نفر بیمار»)، آن موضوع برنده است */
+    const WEAK = ["چند نفر", "چند نفریم", "در مجموع", "روی هم"].map(norm);
+    if (top.length > 1) { const w = top.find(x => x.q.key === "who"); if (w && WEAK.includes(w.w)) top = top.filter(x => x !== w); }
     if (top.length > 1) { const spec = top.filter(x => x.q.key !== "appts"); if (spec.length) top = spec; }
     if (top.length > 1 && top.some(x => x.q.key === "who")) top = top.filter(x => x.q.key === "who" || x.q.key === "leave").slice(0, 1);
-    if (!top.length) return null;
+    if (!top.length) {
+      /* پرسشِ روشن ولی موضوع نامعلوم («امروز اوضاع چطوره؟») ← به‌جای «نفهمیدم»، بپرس درباره‌ی کدام */
+      if (force && has(s, ["چند", "چندتا", "چقدر", "کی", "کیا", "چه کسی", "چه کسانی", "کدام", "کدوم", "چی", "چیه", "چطور", "چطوره", "وضعیت", "آمار", "گزارش"])) {
+        const per = takePeriod(s, ctx.today).period;
+        const pick = ["who", "appts", "income", "leave", "pending", "debt"].map(k => QUERIES.find(q => q.key === k)).filter(q => modOk(ctx, q.mod) && (!ctx.self || q.key === "who"));
+        return { kind: "ask", text: "درباره‌ی کدام می‌پرسی؟", choices: pick.map(q => { const P = per || (q.p === "day" ? { from: ctx.today, to: ctx.today, label: "امروز" } : q.p === "span" ? takePeriod("این ماه", ctx.today).period : null);
+          const it = { kind: "query", key: q.key, label: q.label }; if (P) { it.from = P.from; it.to = P.to; it.plabel = P.label; } it.text = q.label + (P ? " — " + P.label : ""); return { label: q.label, item: it }; }) };
+      }
+      return null;
+    }
     if (!force && !has(s, ASKW) && !/[?؟]/.test(raw || "")) return null;
     const q = top[0].q;
     if (ctx.self && q.key !== "who") return { miss: "پرسش‌ها فعلاً فقط برای مدیر است (جز «چه کسی سر کار است»)" };
