@@ -45,7 +45,7 @@ button.small { font: inherit; font-size: 14px; border: 1px solid var(--line); ba
     <p class="note" style="text-align:center;margin:0">بزن و جمله را بگو؛ وقتی ۱٫۵ ثانیه ساکت شدی خودش تمام می‌کند (یا دوباره بزن).</p>
     <div class="bar" title="بلندی صدا"><i id="lvl" style="transition:none"></i></div>
     <div style="margin-top:8px;font-size:14px">
-      <label style="display:block"><input type="checkbox" id="optGate" checked> فقط صدای نزدیک (صدای دور مثل تلویزیون حذف شود)</label>
+      <label style="display:block"><input type="checkbox" id="optGate"> فقط صدای نزدیک (صدای دور مثل تلویزیون حذف شود)</label>
       <label style="display:block"><input type="checkbox" id="optStop" checked> وقتی ساکت شدم خودش تمام کند</label>
       <label style="display:block"><input type="checkbox" id="optGram"> فقط کلمه‌های دستورها را بشناسد</label>
     </div>
@@ -139,8 +139,7 @@ async function load() {
 let recMode = null, dbg = { frames: 0, fed: 0, results: 0 };
 function getRec() {
   const mode = $("#optGram").checked && VOCAB ? "gram" : "free";
-  if (rec && recMode === mode) return rec;
-  try { if (rec) rec.remove(); } catch (e) {}
+  try { if (rec) rec.remove(); } catch (e) {}   /* هر جمله تشخیص‌دهندهٔ تازه؛ موتور صوتی همان یکی می‌ماند */
   rec = mode === "gram" ? new model.KaldiRecognizer(ctx.sampleRate, JSON.stringify([...VOCAB, "[unk]"])) : new model.KaldiRecognizer(ctx.sampleRate);
   recMode = mode;
   rec.on("result", m => { dbg.results++; const t = (m.result.text || "").trim(); if (on || stopping) { if (t) finalText += (finalText ? " " : "") + t; $("#live").textContent = finalText; } });
@@ -173,7 +172,7 @@ async function start() {
     const copy = ctx.createBuffer(1, d.length, ctx.sampleRate); copy.copyToChannel(new Float32Array(d), 0);
     if (!$("#optGate").checked || G.n < 6) feed(copy);
     else if (G.open > 0) { while (pre.length) feed(pre.shift()); feed(copy); }   /* تازه باز شد ← دو تکهٔ قبلی هم، تا اول کلمه بریده نشود */
-    else { pre.push(copy); if (pre.length > 2) pre.shift(); feed(ctx.createBuffer(1, d.length, ctx.sampleRate)); }
+    else { pre.push(copy); if (pre.length > 2) pre.shift(); }   /* صدای دور اصلاً به موتور داده نمی‌شود (سکوتِ مصنوعی تشخیص را خراب می‌کرد) */
     if ($("#optStop").checked && G.quiet > 1.5) stop();
     else if (Date.now() - t0 > 15000) stop();
   };
