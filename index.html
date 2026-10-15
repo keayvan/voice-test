@@ -40,7 +40,13 @@ button.small { font: inherit; font-size: 14px; border: 1px solid var(--line); ba
     <div class="note" id="dev" style="text-align:center"></div>
     <div class="bar"><i id="prog"></i></div>
     <button id="mic" disabled aria-label="شروع ضبط">🎤</button>
-    <p class="note" style="text-align:center;margin:0">بزن، جمله را بگو، دوباره بزن تا تمام شود.</p>
+    <p class="note" style="text-align:center;margin:0">بزن و جمله را بگو؛ وقتی ساکت شدی خودش تمام می‌کند (یا دوباره بزن).</p>
+    <div class="bar" title="بلندی صدا"><i id="lvl" style="transition:none"></i></div>
+    <div style="margin-top:8px;font-size:14px">
+      <label style="display:block"><input type="checkbox" id="optGate" checked> فقط صدای نزدیک (صدای دور مثل تلویزیون حذف شود)</label>
+      <label style="display:block"><input type="checkbox" id="optStop" checked> وقتی ساکت شدم خودش تمام کند</label>
+      <label style="display:block"><input type="checkbox" id="optGram"> فقط کلمه‌های دستورها را بشناسد</label>
+    </div>
     <div id="live" aria-live="polite"></div>
     <p style="text-align:center;margin:6px 0 0"><button class="small" id="sample" disabled>امتحان با فایل صوتی نمونه (بدون میکروفون)</button></p>
   </div>
@@ -86,6 +92,7 @@ function understand(text) {
   if (r.items.length) return `<span class="ok">✓ ${r.items.map(i => esc(i.text)).join(" | ")}</span>`;
   return `<span class="bad">✗ نفهمید${r.misses[0] && r.misses[0].why ? ": " + esc(r.misses[0].why) : ""}</span>`;
 }
+let VOCAB = null; fetch("vocab.json").then(r => r.json()).then(v => { VOCAB = v; }).catch(() => {});
 let model = null, rec = null, ctx = null, src = null, node = null, stream = null, on = false, t0 = 0, finalText = "";
 function show(text) {
   const conv = words2num(text), ms = Date.now() - t0;
@@ -127,16 +134,33 @@ async function start() {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
   } catch (e) { $("#status").innerHTML = `<span class="bad">اجازهٔ میکروفون داده نشد.</span>`; return; }
   ctx = new (window.AudioContext || window.webkitAudioContext)();
-  rec = new model.KaldiRecognizer(ctx.sampleRate); finalText = "";
+  rec = $("#optGram").checked && VOCAB ? new model.KaldiRecognizer(ctx.sampleRate, JSON.stringify([...VOCAB, "[unk]"])) : new model.KaldiRecognizer(ctx.sampleRate); finalText = "";
   rec.on("result", m => { const t = (m.result.text || "").trim(); if (t) finalText += (finalText ? " " : "") + t; $("#live").textContent = finalText; });
   rec.on("partialresult", m => { $("#live").textContent = (finalText + " " + (m.result.partial || "")).trim(); });
   src = ctx.createMediaStreamSource(stream); node = ctx.createScriptProcessor(4096, 1, 1);
-  node.onaudioprocess = e => { try { rec.acceptWaveform(e.inputBuffer); } catch (x) {} };
+  /* دروازهٔ صدا: کف نویز از نیم‌ثانیهٔ اول؛ صدای نزدیک (بلندتر از کف و نزدیک به اوج صدای خود گوینده) رد می‌شود، بقیه سکوت می‌شود
+     تا Vosk صدای تلویزیون را نشنود و پایان جمله را تشخیص بدهد. سکوتِ ۱ ثانیه بعد از حرف زدن ← پایان خودکار */
+  const G = { floor: 0, n: 0, peak: 0, open: 0, spoke: 0, quiet: 0 }, fr = 4096 / ctx.sampleRate;
+  node.onaudioprocess = e => {
+    if (!on) return;
+    const d = e.inputBuffer.getChannelData(0); let sum = 0; for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
+    const rms = Math.sqrt(sum / d.length);
+    if (G.n < 6) { G.floor = (G.floor * G.n + rms) / (G.n + 1); G.n++; }
+    else if (rms < G.floor) G.floor = G.floor * 0.95 + rms * 0.05;
+    const th = Math.max(G.floor * 2.5, G.peak * 0.3, 0.004), loud = rms > th;
+    if (loud) { G.peak = Math.max(G.peak * 0.995, rms); G.open = 0.35; G.spoke += fr; G.quiet = 0; } else { G.open -= fr; if (G.spoke > 0.3) G.quiet += fr; }
+    $("#lvl").style.width = Math.min(100, Math.round(rms * 400)) + "%"; $("#lvl").style.background = loud ? "var(--ok)" : "var(--muted)";
+    const gate = $("#optGate").checked;
+    if (gate && G.open <= 0 && G.n >= 6) { const z = ctx.createBuffer(1, d.length, ctx.sampleRate); try { rec.acceptWaveform(z); } catch (x) {} }
+    else try { rec.acceptWaveform(e.inputBuffer); } catch (x) {}
+    if ($("#optStop").checked && G.quiet > 1.0) stop();
+    if (Date.now() - t0 > 15000) stop();
+  };
   src.connect(node); node.connect(ctx.destination);
   on = true; t0 = Date.now(); $("#mic").classList.add("on"); $("#mic").textContent = "⏹"; $("#status").textContent = "گوش می‌دهم…"; $("#live").textContent = "";
 }
 async function stop() {
-  on = false; $("#mic").classList.remove("on"); $("#mic").textContent = "🎤"; $("#status").textContent = "آماده است ✓";
+  if (!on) return; on = false; $("#mic").classList.remove("on"); $("#mic").textContent = "🎤"; $("#status").textContent = "آماده است ✓";
   try { node.disconnect(); src.disconnect(); stream.getTracks().forEach(t => t.stop()); } catch (e) {}
   await new Promise(r => setTimeout(r, 300));
   /* تکهٔ آخر: retrieveFinalResult همان رویداد result را می‌فرستد (شنوندهٔ start آن را به finalText اضافه می‌کند) */
