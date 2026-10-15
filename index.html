@@ -19,7 +19,9 @@ h1 { font-size: 20px; margin: 4px 0 2px; }
 #mic.on { background: var(--bad); animation: pulse 1.2s infinite; }
 @keyframes pulse { 50% { transform: scale(1.06); } }
 #status { text-align: center; }
-#live { min-height: 2em; color: var(--muted); }
+#live { min-height: 2.4em; font-size: 20px; font-weight: 600; text-align: center; margin-top: 8px; }
+#live.done { color: var(--ok); }
+#heard { text-align: center; font-size: 15px; }
 .res { border-top: 1px solid var(--line); padding: 8px 0; }
 .res:first-child { border-top: 0; }
 .res b { display: block; }
@@ -40,7 +42,7 @@ button.small { font: inherit; font-size: 14px; border: 1px solid var(--line); ba
     <div class="note" id="dev" style="text-align:center"></div>
     <div class="bar"><i id="prog"></i></div>
     <button id="mic" disabled aria-label="شروع ضبط">🎤</button>
-    <p class="note" style="text-align:center;margin:0">بزن و جمله را بگو؛ وقتی ساکت شدی خودش تمام می‌کند (یا دوباره بزن).</p>
+    <p class="note" style="text-align:center;margin:0">بزن و جمله را بگو؛ وقتی ۱٫۵ ثانیه ساکت شدی خودش تمام می‌کند (یا دوباره بزن).</p>
     <div class="bar" title="بلندی صدا"><i id="lvl" style="transition:none"></i></div>
     <div style="margin-top:8px;font-size:14px">
       <label style="display:block"><input type="checkbox" id="optGate" checked> فقط صدای نزدیک (صدای دور مثل تلویزیون حذف شود)</label>
@@ -48,6 +50,7 @@ button.small { font: inherit; font-size: 14px; border: 1px solid var(--line); ba
       <label style="display:block"><input type="checkbox" id="optGram"> فقط کلمه‌های دستورها را بشناسد</label>
     </div>
     <div id="live" aria-live="polite"></div>
+    <div id="heard"></div>
     <p style="text-align:center;margin:6px 0 0"><button class="small" id="sample" disabled>امتحان با فایل صوتی نمونه (بدون میکروفون)</button></p>
   </div>
 
@@ -96,6 +99,7 @@ let VOCAB = null; fetch("vocab.json").then(r => r.json()).then(v => { VOCAB = v;
 let model = null, rec = null, ctx = null, src = null, node = null, stream = null, on = false, t0 = 0, finalText = "";
 function show(text) {
   const conv = words2num(text), ms = Date.now() - t0;
+  $("#heard").innerHTML = text ? "برنامه می‌فهمد: " + understand(conv) : "";
   $("#out").insertAdjacentHTML("afterbegin", `<div class="res"><b>${esc(text || "(چیزی شنیده نشد)")}</b>
     ${conv !== text ? `<div class="note">با رقم: ${esc(fa(conv))}</div>` : ""}<div>برنامه می‌فهمد: ${text ? understand(conv) : "—"}</div>
     <div class="note">${fa((ms / 1000).toFixed(1))} ثانیه از شروع ضبط</div></div>`);
@@ -140,24 +144,28 @@ async function start() {
   src = ctx.createMediaStreamSource(stream); node = ctx.createScriptProcessor(4096, 1, 1);
   /* دروازهٔ صدا: کف نویز از نیم‌ثانیهٔ اول؛ صدای نزدیک (بلندتر از کف و نزدیک به اوج صدای خود گوینده) رد می‌شود، بقیه سکوت می‌شود
      تا Vosk صدای تلویزیون را نشنود و پایان جمله را تشخیص بدهد. سکوتِ ۱ ثانیه بعد از حرف زدن ← پایان خودکار */
-  const G = { floor: 0, n: 0, peak: 0, open: 0, spoke: 0, quiet: 0 }, fr = 4096 / ctx.sampleRate;
+  const G = { floor: 0, n: 0, peak: 0, open: 0, spoke: 0, quiet: 0 }, fr = 4096 / ctx.sampleRate, pre = [];
   node.onaudioprocess = e => {
     if (!on) return;
     const d = e.inputBuffer.getChannelData(0); let sum = 0; for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
     const rms = Math.sqrt(sum / d.length);
     if (G.n < 6) { G.floor = (G.floor * G.n + rms) / (G.n + 1); G.n++; }
     else if (rms < G.floor) G.floor = G.floor * 0.95 + rms * 0.05;
-    const th = Math.max(G.floor * 2.5, G.peak * 0.3, 0.004), loud = rms > th;
-    if (loud) { G.peak = Math.max(G.peak * 0.995, rms); G.open = 0.35; G.spoke += fr; G.quiet = 0; } else { G.open -= fr; if (G.spoke > 0.3) G.quiet += fr; }
-    $("#lvl").style.width = Math.min(100, Math.round(rms * 400)) + "%"; $("#lvl").style.background = loud ? "var(--ok)" : "var(--muted)";
-    const gate = $("#optGate").checked;
-    if (gate && G.open <= 0 && G.n >= 6) { const z = ctx.createBuffer(1, d.length, ctx.sampleRate); try { rec.acceptWaveform(z); } catch (x) {} }
-    else try { rec.acceptWaveform(e.inputBuffer); } catch (x) {}
-    if ($("#optStop").checked && G.quiet > 1.0) stop();
+    /* آستانه ملایم: ۲ برابر کف نویز یا ۱۵٪ اوج صدای گوینده؛ بعد از هر صدای بلند ۰٫۷ ثانیه باز می‌ماند تا آخر کلمه‌ها بریده نشود */
+    const th = Math.max(G.floor * 2, G.peak * 0.15, 0.003), loud = rms > th;
+    if (loud) { G.peak = Math.max(G.peak * 0.997, rms); G.open = 0.7; G.spoke += fr; G.quiet = 0; } else { G.open -= fr; if (G.spoke > 0.3) G.quiet += fr; }
+    $("#lvl").style.width = Math.min(100, Math.round(rms * 400)) + "%"; $("#lvl").style.background = G.open > 0 ? "var(--ok)" : "var(--muted)";
+    const copy = ctx.createBuffer(1, d.length, ctx.sampleRate); copy.copyToChannel(new Float32Array(d), 0);
+    if (!$("#optGate").checked || G.n < 6) { try { rec.acceptWaveform(copy); } catch (x) {} }
+    else if (G.open > 0) {   /* تازه باز شد ← دو تکهٔ قبلی هم فرستاده می‌شود تا اول کلمه بریده نشود */
+      while (pre.length) { try { rec.acceptWaveform(pre.shift()); } catch (x) {} }
+      try { rec.acceptWaveform(copy); } catch (x) {}
+    } else { pre.push(copy); if (pre.length > 2) { pre.shift(); } try { rec.acceptWaveform(ctx.createBuffer(1, d.length, ctx.sampleRate)); } catch (x) {} }
+    if ($("#optStop").checked && G.quiet > 1.5) stop();
     if (Date.now() - t0 > 15000) stop();
   };
   src.connect(node); node.connect(ctx.destination);
-  on = true; t0 = Date.now(); $("#mic").classList.add("on"); $("#mic").textContent = "⏹"; $("#status").textContent = "گوش می‌دهم…"; $("#live").textContent = "";
+  on = true; t0 = Date.now(); $("#mic").classList.add("on"); $("#mic").textContent = "⏹"; $("#status").textContent = "گوش می‌دهم…"; $("#live").textContent = ""; $("#live").classList.remove("done"); $("#heard").innerHTML = "";
 }
 async function stop() {
   if (!on) return; on = false; $("#mic").classList.remove("on"); $("#mic").textContent = "🎤"; $("#status").textContent = "آماده است ✓";
@@ -168,7 +176,7 @@ async function stop() {
   for (let i = 0; i < 15 && finalText.length === n0; i++) await new Promise(r => setTimeout(r, 100));
   const text = finalText.trim();
   try { rec.remove(); } catch (e) {} try { ctx.close(); } catch (e) {}
-  $("#live").textContent = ""; show(text);
+  $("#live").textContent = text || "(چیزی شنیده نشد)"; $("#live").classList.add("done"); show(text);
 }
 /* فایل نمونهٔ خود مدل («من عرضه این کارو ندارم») برای اطمینان از کار کردن موتور بدون میکروفون */
 $("#sample").onclick = async () => {
